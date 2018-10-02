@@ -1,41 +1,84 @@
+#include "device.h"
+
+#include "libfreenect.hpp"
+
 #include <iostream>
+#include <set>
 
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 
-typedef websocketpp::server<websocketpp::config::asio> server;
+class DeviceBroadcastServer {
+ public:
+  DeviceBroadcastServer(lptc_coderdojo::KinectDevice *_device) {
+    s.clear_access_channels(websocketpp::log::alevel::all);
+    s.init_asio();
+    s.set_open_handler(std::bind(&DeviceBroadcastServer::OnConnectionOpen, this,
+                                 std::placeholders::_1));
+    s.set_close_handler(std::bind(&DeviceBroadcastServer::OnConnectionClosed,
+                                  this, std::placeholders::_1));
+    device = _device;
+  }
 
-class WsServer {
-public:
-    WsServer() {
-        s.set_error_channels(websocketpp::log::elevel::all);
-        s.set_access_channels(websocketpp::log::alevel::all ^ websocketpp::log::alevel::frame_payload);
+  void BroadcastVideoFrames() {
+    while (1) {
+      const std::vector<uint8_t> frame = device->GetNextVideoRGBAFrame();
 
-        s.init_asio();
-        s.set_message_handler(std::bind(
-            &WsServer::on_message, this,
-            std::placeholders::_1, std::placeholders::_2
-        ));
+      if (!frame.empty()) {
+        std::lock_guard<std::mutex> guard(connections_lock);
+        connection_set::iterator iter;
+        for (iter = connections.begin(); iter != connections.end(); ++iter) {
+          int size = sizeof(uint8_t) * frame.size();
+          s.send(*iter, frame.data(), size, websocketpp::frame::opcode::binary);
+        }
+      }
     }
-    
-    void on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
-        const std::string msg_str = msg->get_payload();
-        s.send(hdl, msg_str, msg->get_opcode());
-    }
+  }
 
-    void run() {
-        s.listen(port);
-        s.start_accept();
-        std::cout << "Listening on port " << port << "..." << std::endl;
-        s.run();
-    }
+  void StartDeviceStreams() { device->StartVideo(); }
 
-private:
-    server s;
-    const int port = 9002;
+  void OnConnectionClosed(websocketpp::connection_hdl hdl) {
+    std::lock_guard<std::mutex> guard(connections_lock);
+    connections.erase(hdl);
+  }
+
+  void OnConnectionOpen(websocketpp::connection_hdl hdl) {
+    std::lock_guard<std::mutex> guard(connections_lock);
+    connections.insert(hdl);
+  }
+
+  void run() {
+    s.listen(port);
+    s.start_accept();
+    std::cout << "Listening on port " << port << "..." << std::endl;
+
+    StartDeviceStreams();
+    std::cout << "Started Kinect Streaming." << std::endl;
+    std::thread broadcast_thread(
+        std::bind(&DeviceBroadcastServer::BroadcastVideoFrames, this));
+
+    s.run();
+    broadcast_thread.join();
+  }
+
+ private:
+  typedef std::set<websocketpp::connection_hdl,
+                   std::owner_less<websocketpp::connection_hdl>>
+      connection_set;
+
+  const int port = 9002;
+  websocketpp::server<websocketpp::config::asio> s;
+  connection_set connections;
+  std::mutex connections_lock;
+
+  lptc_coderdojo::KinectDevice *device;
 };
 
 int main() {
-    WsServer s;
-    s.run();
+  Freenect::Freenect freenect;
+  lptc_coderdojo::OpenKinectDevice *device =
+      &freenect.createDevice<lptc_coderdojo::OpenKinectDevice>(0);
+
+  DeviceBroadcastServer s(device);
+  s.run();
 }
