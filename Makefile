@@ -1,22 +1,24 @@
 CC=clang++
 LD=clang++
 CFLAGS=-g -Wall -std=c++11 -stdlib=libc++
-LIBS=-lboost_system
-INCLUDES=-I ./libs/websocketpp/
+LIBS=-lboost_system `pkg-config --libs libfreenect`
+INCLUDES=-I ./libs/websocketpp/ `pkg-config --cflags libfreenect`
 BUILDDIR=build
-OBJ=server.o
-BIN=server
+OBJS=$(addprefix $(BUILDDIR)/,server.o device.o)
+BIN=$(addprefix $(BUILDDIR)/,server)
 
-all: dir $(BUILDDIR)/$(BIN)
-
-dir:
-	mkdir -p $(BUILDDIR)
+all: $(BIN)
 
 $(BUILDDIR)/%.o: %.cc
-		$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-$(BUILDDIR)/$(BIN): $(BUILDDIR)/$(OBJ)
-	$(LD) $(LIBS) $(BUILDDIR)/$(OBJ) -o $(BUILDDIR)/$(BIN)
+$(BIN): $(OBJS)
+	$(LD) $(CFLAGS) $(LIBS) -o $(BIN) $(OBJS)
+
+$(OBJS): | $(BUILDDIR)
+
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
 
 clean:
-	rm -rf $(BUILDDIR)/*.o $(BUILDDIR)/$(BIN)
+	rm -rf $(BUILDDIR)/*.o $(BIN)
