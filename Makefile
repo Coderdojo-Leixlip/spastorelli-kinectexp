@@ -20,5 +20,8 @@ $(OBJS): | $(BUILDDIR)
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
+format:
+	clang-format -style=file -i *.cc *.h
+
 clean:
 	rm -rf $(BUILDDIR)/*.o $(BIN)
