@@ -12,7 +12,7 @@ all: dir $(BUILDDIR)/$(BIN)
 dir:
 	mkdir -p $(BUILDDIR)
 
-$(BUILDDIR)/%.o: %.cpp
+$(BUILDDIR)/%.o: %.cc
 		$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 $(BUILDDIR)/$(BIN): $(BUILDDIR)/$(OBJ)
