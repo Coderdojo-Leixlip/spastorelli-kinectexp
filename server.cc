@@ -10,19 +10,19 @@
 
 class DeviceBroadcastServer {
  public:
-  DeviceBroadcastServer(lptc_coderdojo::KinectDevice *_device) {
+  DeviceBroadcastServer(lptc_coderdojo::KinectDevice& _device)
+      : device(_device) {
     s.clear_access_channels(websocketpp::log::alevel::all);
     s.init_asio();
     s.set_open_handler(std::bind(&DeviceBroadcastServer::OnConnectionOpen, this,
                                  std::placeholders::_1));
     s.set_close_handler(std::bind(&DeviceBroadcastServer::OnConnectionClosed,
                                   this, std::placeholders::_1));
-    device = _device;
   }
 
   void BroadcastVideoFrames() {
     while (1) {
-      const std::vector<uint8_t> frame = device->GetNextVideoRGBAFrame();
+      const std::vector<uint8_t>& frame = device.GetNextVideoRGBAFrame();
 
       if (!frame.empty()) {
         std::lock_guard<std::mutex> guard(connections_lock);
@@ -35,7 +35,7 @@ class DeviceBroadcastServer {
     }
   }
 
-  void StartDeviceStreams() { device->StartVideo(); }
+  void StartDeviceStreams() { device.StartVideo(); }
 
   void OnConnectionClosed(websocketpp::connection_hdl hdl) {
     std::lock_guard<std::mutex> guard(connections_lock);
@@ -71,13 +71,13 @@ class DeviceBroadcastServer {
   connection_set connections;
   std::mutex connections_lock;
 
-  lptc_coderdojo::KinectDevice *device;
+  lptc_coderdojo::KinectDevice& device;
 };
 
 int main() {
   Freenect::Freenect freenect;
-  lptc_coderdojo::OpenKinectDevice *device =
-      &freenect.createDevice<lptc_coderdojo::OpenKinectDevice>(0);
+  lptc_coderdojo::KinectDevice& device =
+      freenect.createDevice<lptc_coderdojo::OpenKinectDevice>(0);
 
   DeviceBroadcastServer s(device);
   s.run();
