@@ -45,35 +45,35 @@ bool FrameQueue<T>::QueueNotEmptyPred() {
 OpenKinectDevice::OpenKinectDevice(freenect_context* ctx, int index)
     : Freenect::FreenectDevice(ctx, index) {
   setVideoFormat(FREENECT_VIDEO_RGB);
-  setDepthFormat(FREENECT_DEPTH_REGISTERED);
+  setDepthFormat(FREENECT_DEPTH_11BIT);
   depth_mode = freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM,
-                                        FREENECT_DEPTH_REGISTERED);
+                                        FREENECT_DEPTH_11BIT);
   video_mode =
       freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB);
 }
 
 void OpenKinectDevice::DepthCallback(void* _depth, uint32_t timestamp) {
-  std::vector<uint16_t> frame(depth_mode.bytes / 2);
   uint16_t* depth = static_cast<uint16_t*>(_depth);
 
-  int depthBufSize = getDepthBufferSize();
-  std::copy(depth, depth + depthBufSize / 2, frame.begin());
+  int frame_rect_size = depth_mode.width * depth_mode.height;
+  std::vector<uint8_t> frame =
+      ConvertDepthDataToGreyscale(depth, frame_rect_size);
   depth_frames.Push(frame);
 }
 
-void OpenKinectDevice::VideoCallback(void* _rgb, uint32_t timestamp) {
-  uint8_t* rgb = static_cast<uint8_t*>(_rgb);
+void OpenKinectDevice::VideoCallback(void* _video, uint32_t timestamp) {
+  uint8_t* video = static_cast<uint8_t*>(_video);
 
   int frame_rect_size = video_mode.width * video_mode.height;
-  std::vector<uint8_t> frame = ConvertToRGBAFrame(rgb, frame_rect_size);
+  std::vector<uint8_t> frame = ConvertVideoDataToRGBA(video, frame_rect_size);
   video_frames.Push(frame);
 }
 
-std::vector<uint16_t> OpenKinectDevice::GetNextDepthFrame() {
+std::vector<uint8_t> OpenKinectDevice::GetNextDepthFrame() {
   return depth_frames.Pop(kLockTimeout);
 }
 
-std::vector<uint8_t> OpenKinectDevice::GetNextVideoRGBAFrame() {
+std::vector<uint8_t> OpenKinectDevice::GetNextVideoFrame() {
   return video_frames.Pop(kLockTimeout);
 }
 
@@ -85,12 +85,26 @@ void OpenKinectDevice::StopDepth() { stopDepth(); }
 
 void OpenKinectDevice::StopVideo() { stopDepth(); }
 
-std::vector<uint8_t> OpenKinectDevice::ConvertToRGBAFrame(uint8_t* rgb, const int rect_size) {
+std::vector<uint8_t> OpenKinectDevice::ConvertDepthDataToGreyscale(
+    uint16_t* depth, const int rect_size) {
   std::vector<uint8_t> frame(rect_size * 4);
   for (int i = 0; i < rect_size; i++) {
-    frame[i * 4] = rgb[i * 3];
-    frame[i * 4 + 1] = rgb[i * 3 + 1];
-    frame[i * 4 + 2] = rgb[i * 3 + 2];
+    uint8_t val = (uint8_t)depth[i];
+    frame[i * 4] = 255 - val;
+    frame[i * 4 + 1] = 255 - val;
+    frame[i * 4 + 2] = 255 - val;
+    frame[i * 4 + 3] = 255;
+  }
+  return frame;
+}
+
+std::vector<uint8_t> OpenKinectDevice::ConvertVideoDataToRGBA(
+    uint8_t* video, const int rect_size) {
+  std::vector<uint8_t> frame(rect_size * 4);
+  for (int i = 0; i < rect_size; i++) {
+    frame[i * 4] = video[i * 3];
+    frame[i * 4 + 1] = video[i * 3 + 1];
+    frame[i * 4 + 2] = video[i * 3 + 2];
     frame[i * 4 + 3] = 255;
   }
   return frame;

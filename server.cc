@@ -20,10 +20,9 @@ class DeviceBroadcastServer {
                                   this, std::placeholders::_1));
   }
 
-  void BroadcastVideoFrames() {
+  void BroadcastFrames() {
     while (1) {
-      const std::vector<uint8_t>& frame = device.GetNextVideoRGBAFrame();
-
+      const std::vector<uint8_t>& frame = device.GetNextDepthFrame();
       if (!frame.empty()) {
         std::lock_guard<std::mutex> guard(connections_lock);
         connection_set::iterator iter;
@@ -35,7 +34,7 @@ class DeviceBroadcastServer {
     }
   }
 
-  void StartDeviceStreams() { device.StartVideo(); }
+  void StartDeviceStreams() { device.StartDepth(); }
 
   void OnConnectionClosed(websocketpp::connection_hdl hdl) {
     std::lock_guard<std::mutex> guard(connections_lock);
@@ -55,7 +54,7 @@ class DeviceBroadcastServer {
     StartDeviceStreams();
     std::cout << "Started Kinect Streaming." << std::endl;
     std::thread broadcast_thread(
-        std::bind(&DeviceBroadcastServer::BroadcastVideoFrames, this));
+        std::bind(&DeviceBroadcastServer::BroadcastFrames, this));
 
     s.run();
     broadcast_thread.join();
