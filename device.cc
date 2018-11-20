@@ -46,6 +46,7 @@ OpenKinectDevice::OpenKinectDevice(freenect_context* ctx, int index)
     : Freenect::FreenectDevice(ctx, index) {
   setVideoFormat(FREENECT_VIDEO_RGB);
   setDepthFormat(FREENECT_DEPTH_11BIT);
+  freenect_set_log_level(ctx, FREENECT_LOG_ERROR);
   depth_mode = freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM,
                                         FREENECT_DEPTH_11BIT);
   video_mode =
