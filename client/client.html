@@ -1,18 +1,41 @@
 <!DOCTYPE html>
 <html>
 <canvas width=640 height=480></canvas>
+<div>
+<label for="topic">Topic: </label>
+<input name="topic" id="topic" type="text" />
+<button id="action">Start</button>
+</div>
 <script>
+  var actionButton = document.getElementById("action");
+  var topicInput = document.getElementById("topic");
+  var feedOn = false;
   var canvas = document.querySelector('canvas');
   var ws = new WebSocket("ws://localhost:9002");
+
   ws.binaryType = 'arraybuffer';
   ws.onopen = function() {
       console.log("Connected to stream");
   };
   ws.onmessage = function(msg) {
+    console.log(typeof msg.data);
     var imageData = new ImageData(new Uint8ClampedArray(msg.data), 640, 480);
     var ctx = canvas.getContext("2d");
     ctx.putImageData(imageData, 0, 0);
   };
+
+  actionButton.onclick = function() {
+    const topic = topicInput.value;
+    if (!feedOn) {
+      ws.send(`SUBSCRIBE ${topic}`);
+      actionButton.textContent = "Stop";
+      feedOn = true;
+    } else {
+      ws.send(`UNSUBSCRIBE ${topic}`);
+      actionButton.textContent = "Start";
+      feedOn = false;
+    }
+  }
 </script>
 </body>
 </html>
