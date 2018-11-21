@@ -15,10 +15,10 @@ class FrameQueue {
   FrameQueue();
 
   void Push(const std::vector<T>& data);
-  std::vector<T> Pop(const std::chrono::milliseconds& timeout);
+  bool Pop(std::vector<T>&, const std::chrono::milliseconds& timeout);
 
  private:
-  std::vector<T> PopInternal();
+  bool PopInternal(std::vector<T>&);
   bool QueueNotEmptyPred();
 
   std::queue<std::vector<T>> queue;
@@ -31,8 +31,8 @@ class KinectDevice {
   KinectDevice() = default;
   virtual ~KinectDevice() = default;
 
-  virtual std::vector<uint8_t> GetNextDepthFrame() = 0;
-  virtual std::vector<uint8_t> GetNextVideoFrame() = 0;
+  virtual bool GetNextDepthFrame(std::vector<uint8_t>&) = 0;
+  virtual bool GetNextVideoFrame(std::vector<uint8_t>&) = 0;
   virtual void StartVideo() = 0;
   virtual void StartDepth() = 0;
   virtual void StopVideo() = 0;
@@ -46,8 +46,8 @@ class OpenKinectDevice : public KinectDevice, public Freenect::FreenectDevice {
   void DepthCallback(void* _depth, uint32_t timestamp);
   void VideoCallback(void* _rgb, uint32_t timestamp);
 
-  std::vector<uint8_t> GetNextDepthFrame();
-  std::vector<uint8_t> GetNextVideoFrame();
+  bool GetNextDepthFrame(std::vector<uint8_t>&);
+  bool GetNextVideoFrame(std::vector<uint8_t>&);
   void StartDepth();
   void StartVideo();
   void StopDepth();

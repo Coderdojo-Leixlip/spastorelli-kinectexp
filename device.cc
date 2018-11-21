@@ -15,26 +15,27 @@ void FrameQueue<T>::Push(const std::vector<T>& data) {
 }
 
 template <typename T>
-std::vector<T> FrameQueue<T>::Pop(const std::chrono::milliseconds& timeout) {
+bool FrameQueue<T>::Pop(std::vector<T>& data,
+                        const std::chrono::milliseconds& timeout) {
   std::unique_lock<std::mutex> lock(queue_lock);
 
   if (queue.empty()) {
     if (queue_cond.wait_for(lock, timeout,
                             std::bind(&FrameQueue::QueueNotEmptyPred, this))) {
-      return PopInternal();
+      return PopInternal(data);
     } else {
-      return std::vector<T>();
+      return false;
     }
   } else {
-    return PopInternal();
+    return PopInternal(data);
   }
 }
 
 template <typename T>
-std::vector<T> FrameQueue<T>::PopInternal() {
-  std::vector<T> data = queue.front();
+bool FrameQueue<T>::PopInternal(std::vector<T>& data) {
+  data = queue.front();
   queue.pop();
-  return data;
+  return true;
 }
 
 template <typename T>
@@ -70,12 +71,12 @@ void OpenKinectDevice::VideoCallback(void* _video, uint32_t timestamp) {
   video_frames.Push(frame);
 }
 
-std::vector<uint8_t> OpenKinectDevice::GetNextDepthFrame() {
-  return depth_frames.Pop(kLockTimeout);
+bool OpenKinectDevice::GetNextDepthFrame(std::vector<uint8_t>& frame) {
+  return depth_frames.Pop(frame, kLockTimeout);
 }
 
-std::vector<uint8_t> OpenKinectDevice::GetNextVideoFrame() {
-  return video_frames.Pop(kLockTimeout);
+bool OpenKinectDevice::GetNextVideoFrame(std::vector<uint8_t>& frame) {
+  return video_frames.Pop(frame, kLockTimeout);
 }
 
 void OpenKinectDevice::StartDepth() { startDepth(); }
