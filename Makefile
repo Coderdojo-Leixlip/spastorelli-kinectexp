@@ -7,8 +7,8 @@ FAKENECT_LIB=/usr/local/lib/fakenect/
 FAKENECT_TEST_DATA=test_data
 INCLUDES=-I ./libs/websocketpp/ `pkg-config --cflags libfreenect`
 BUILDDIR=build
-OBJS=$(addprefix $(BUILDDIR)/,server.o device.o)
-BIN=$(addprefix $(BUILDDIR)/,server)
+OBJS=$(addprefix $(BUILDDIR)/,run_server.o server.o device.o)
+BIN=$(addprefix $(BUILDDIR)/,kinect_serve)
 
 all: $(BIN)
 
