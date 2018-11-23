@@ -85,7 +85,7 @@ void OpenKinectDevice::StartVideo() { startVideo(); }
 
 void OpenKinectDevice::StopDepth() { stopDepth(); }
 
-void OpenKinectDevice::StopVideo() { stopDepth(); }
+void OpenKinectDevice::StopVideo() { stopVideo(); }
 
 std::vector<uint8_t> OpenKinectDevice::ConvertDepthDataToGreyscale(
     uint16_t* depth, const int rect_size) {
