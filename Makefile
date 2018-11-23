@@ -1,6 +1,6 @@
 CC=clang++
 LD=clang++
-CFLAGS=-g -Wall -std=c++11 -stdlib=libc++
+CFLAGS=-O2 -g -Wall -std=c++11 -stdlib=libc++
 LIBS=-lboost_system `pkg-config --libs libfreenect`
 FAKENECT=OFF
 FAKENECT_LIB=/usr/local/lib/fakenect/
