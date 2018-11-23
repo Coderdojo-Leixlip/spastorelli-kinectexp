@@ -90,6 +90,8 @@ BroadcastServer::BroadcastServer(lptc_coderdojo::KinectDevice& _device,
     : port(_port), device(_device) {
   s.clear_access_channels(websocketpp::log::alevel::all);
   s.init_asio();
+  s.set_open_handler(std::bind(&BroadcastServer::OnConnectionOpened, this,
+                               std::placeholders::_1));
   s.set_close_handler(std::bind(&BroadcastServer::OnConnectionClosed, this,
                                 std::placeholders::_1));
   s.set_message_handler(std::bind(&BroadcastServer::OnMessage, this,
@@ -106,10 +108,27 @@ void BroadcastServer::BroadcastToChannel(const std::string ch_name,
     return;
   }
 
-  while (1) {
+  while (term_future.wait_for(std::chrono::microseconds(1)) ==
+         std::future_status::timeout) {
     std::vector<uint8_t> frame;
     if (producer(frame) && !frame.empty()) {
       ch->Publish(frame.data(), frame.size());
+    }
+  }
+  std::cout << "Stopped broadcasting to `" << ch_name << "` channel."
+            << std::endl;
+}
+
+void BroadcastServer::CloseConnections(const std::string& reason) {
+  std::lock_guard<std::mutex> guard(connections_lock);
+
+  ConnectionSet::iterator iter;
+  for (iter = connections.begin(); iter != connections.end(); ++iter) {
+    try {
+      AsioServer::connection_ptr conn = s.get_con_from_hdl(*iter);
+      conn->close(websocketpp::close::status::going_away, reason);
+    } catch (websocketpp::exception const& e) {
+      std::cerr << "!!!Error: " << e.m_msg << std::endl;
     }
   }
 }
@@ -126,6 +145,14 @@ void BroadcastServer::OnConnectionClosed(websocketpp::connection_hdl hdl) {
   for (iter = channels.begin(); iter != channels.end(); ++iter) {
     iter->second.Unsubscribe(hdl);
   }
+
+  std::lock_guard<std::mutex> guard(connections_lock);
+  connections.erase(hdl);
+}
+
+void BroadcastServer::OnConnectionOpened(websocketpp::connection_hdl hdl) {
+  std::lock_guard<std::mutex> guard(connections_lock);
+  connections.insert(hdl);
 }
 
 void BroadcastServer::OnMessage(websocketpp::connection_hdl hdl,
@@ -158,11 +185,15 @@ void BroadcastServer::RegisterChannel(const std::string& name) {
   channels.insert(ChannelMap::value_type(ch.GetTopic(), ch));
 }
 
+void BroadcastServer::StopAllChannelBroadcasts() { term_sig.set_value(); }
+
 void BroadcastServer::Run() {
   s.listen(port);
   s.start_accept();
   std::cout << "Listening on port " << port << "..." << std::endl;
   std::cout << "Started Kinect BroadcastServer." << std::endl;
+
+  term_future = term_sig.get_future();
 
   device.StartVideo();
   RegisterChannel("video");
@@ -184,4 +215,18 @@ void BroadcastServer::Run() {
   video_broadcast_thread.join();
   depth_broadcast_thread.join();
 }
+
+void BroadcastServer::Stop() {
+  std::cout << "Shutting down BroadcastServer...." << std::endl;
+  s.stop_listening();
+
+  device.StopVideo();
+  device.StopDepth();
+
+  std::cout << "Closing connections..." << std::endl;
+  CloseConnections("Shutting down server.");
+  std::cout << "Stopping channel broadcasts..." << std::endl;
+  StopAllChannelBroadcasts();
+}
+
 }  // namespace lptc_coderdojo

@@ -3,6 +3,7 @@
 
 #include "device.h"
 
+#include <future>
 #include <iostream>
 #include <set>
 #include <vector>
@@ -13,6 +14,9 @@
 namespace lptc_coderdojo {
 
 typedef websocketpp::server<websocketpp::config::asio> AsioServer;
+typedef std::set<websocketpp::connection_hdl,
+                 std::owner_less<websocketpp::connection_hdl>>
+    ConnectionSet;
 
 class Command {
  public:
@@ -47,10 +51,6 @@ class Channel {
   void Unsubscribe(websocketpp::connection_hdl hdl);
 
  private:
-  typedef std::set<websocketpp::connection_hdl,
-                   std::owner_less<websocketpp::connection_hdl>>
-      ConnectionSet;
-
   std::string topic;
   ConnectionSet subscribers;
   std::mutex subscribers_lock;
@@ -64,20 +64,31 @@ class BroadcastServer {
   BroadcastServer(lptc_coderdojo::KinectDevice& _device, const int _port);
 
   void Run();
+  void Stop();
 
  private:
   void BroadcastToChannel(const std::string ch_name, DataProducer producer);
+  void CloseConnections(const std::string& reason);
   Channel* GetChannel(const std::string& topic);
   void OnConnectionClosed(websocketpp::connection_hdl hdl);
+  void OnConnectionOpened(websocketpp::connection_hdl hdl);
   void OnMessage(websocketpp::connection_hdl hdl, AsioServer::message_ptr msg);
   void RegisterChannel(const std::string& name);
+  void StopAllChannelBroadcasts();
 
   typedef std::map<std::string, Channel> ChannelMap;
 
   const int port;
+
+  std::promise<void> term_sig;
+  std::future<void> term_future;
+
   AsioServer s;
   lptc_coderdojo::KinectDevice& device;
+
   ChannelMap channels;
+  ConnectionSet connections;
+  std::mutex connections_lock;
 };
 
 }  // namespace lptc_coderdojo
