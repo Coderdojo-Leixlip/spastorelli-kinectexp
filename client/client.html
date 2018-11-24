@@ -1,40 +1,92 @@
 <!DOCTYPE html>
 <html>
-<canvas width=640 height=480></canvas>
-<div>
-<label for="topic">Topic: </label>
-<input name="topic" id="topic" type="text" />
-<button id="action">Start</button>
+<head>
+  <meta charset="utf-8"/>
+  <link rel="stylesheet" href="style.css" type="text/css" />
+</head>
+<body>
+<div class="container">
+  <div class="section header">
+      <span class="header-title">LPTC CoderDojo</span>
+      <span class="header-logo"></span>
+  </div>
+  <div class="section container">
+    <div class="section">
+      <canvas class="feed" width=640 height=480></canvas>
+    </div>
+    <div class="section">
+      <div class="container">
+        <div class="section">
+          <fieldset>
+            <div class="row">
+              <label for="topic">Topic ></label>
+              <input name="topic" id="topic" type="text" />
+            </div>
+            <button id="action">Subscribe</button>
+          </fieldset>
+        </div>
+        <div class="section">
+          <div class="debug"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 <script>
   var actionButton = document.getElementById("action");
   var topicInput = document.getElementById("topic");
+  var debugConsole = document.querySelector('.debug');
   var feedOn = false;
+  var connected = false;
   var canvas = document.querySelector('canvas');
   var ws = new WebSocket("ws://localhost:9002");
 
+  var logToDebugConsole = function(data) {
+    var msg = data.msg;
+    var cls = data.class || '';
+    var msgElem = document.createElement('div');
+    msgElem.className = 'debug-msg ' + cls;
+    msgElem.textContent = msg;
+    debugConsole.appendChild(msgElem);
+    debugConsole.scrollTop = debugConsole.scrollHeight;
+    console.log(msg);
+  };
+
   ws.binaryType = 'arraybuffer';
   ws.onopen = function() {
-      console.log("Connected to stream");
+    connected = true;
+    logToDebugConsole({msg: `✅ Connected to server.`, class: 'evt'});
   };
   ws.onmessage = function(msg) {
     console.log(typeof msg.data);
-    var imageData = new ImageData(new Uint8ClampedArray(msg.data), 640, 480);
-    var ctx = canvas.getContext("2d");
-    ctx.putImageData(imageData, 0, 0);
+    if (typeof msg.data === "object") {
+      var imageData = new ImageData(new Uint8ClampedArray(msg.data), 640, 480);
+      var ctx = canvas.getContext("2d");
+      ctx.putImageData(imageData, 0, 0);
+    } else {
+      logToDebugConsole({msg: `📥 < ${msg.data}`, class: 'itsvr'});
+    }
   };
+  ws.onclose = function(ev) {
+    connected = false;
+    logToDebugConsole({msg: `❌ Connection closed (code: ${ev.code})`, class: 'evt'});
+  }
 
   actionButton.onclick = function() {
     const topic = topicInput.value;
+    var command;
     if (!feedOn) {
-      ws.send(`SUBSCRIBE ${topic}`);
-      actionButton.textContent = "Stop";
+      command = `SUBSCRIBE ${topic}`;
+      ws.send(command);
+      actionButton.textContent = "Unsubscribe";
       feedOn = true;
     } else {
-      ws.send(`UNSUBSCRIBE ${topic}`);
-      actionButton.textContent = "Start";
+      command = `UNSUBSCRIBE ${topic}`;
+      ws.send(command);
+      actionButton.textContent = "Subscribe";
       feedOn = false;
     }
+    logToDebugConsole({msg: `📤 > ${command}`, class: 'clt'});
   }
 </script>
 </body>
