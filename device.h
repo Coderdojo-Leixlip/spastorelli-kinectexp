@@ -31,7 +31,9 @@ class KinectDevice {
   KinectDevice() = default;
   virtual ~KinectDevice() = default;
 
-  virtual bool GetNextDepthFrame(std::vector<uint8_t>&) = 0;
+  virtual int GetDepthFrameRectSize() = 0;
+  virtual int GetVideoFrameRectSize() = 0;
+  virtual bool GetNextDepthFrame(std::vector<uint16_t>&) = 0;
   virtual bool GetNextVideoFrame(std::vector<uint8_t>&) = 0;
   virtual void StartVideo() = 0;
   virtual void StartDepth() = 0;
@@ -46,7 +48,9 @@ class OpenKinectDevice : public KinectDevice, public Freenect::FreenectDevice {
   void DepthCallback(void* _depth, uint32_t timestamp);
   void VideoCallback(void* _rgb, uint32_t timestamp);
 
-  bool GetNextDepthFrame(std::vector<uint8_t>&);
+  int GetDepthFrameRectSize();
+  int GetVideoFrameRectSize();
+  bool GetNextDepthFrame(std::vector<uint16_t>&);
   bool GetNextVideoFrame(std::vector<uint8_t>&);
   void StartDepth();
   void StartVideo();
@@ -54,15 +58,10 @@ class OpenKinectDevice : public KinectDevice, public Freenect::FreenectDevice {
   void StopVideo();
 
  private:
-  std::vector<uint8_t> ConvertDepthDataToGreyscale(uint16_t* depth,
-                                                   const int rect_size);
-  std::vector<uint8_t> ConvertVideoDataToRGBA(uint8_t* video,
-                                              const int rect_size);
-
   freenect_frame_mode depth_mode;
   freenect_frame_mode video_mode;
 
-  FrameQueue<uint8_t> depth_frames;
+  FrameQueue<uint16_t> depth_frames;
   FrameQueue<uint8_t> video_frames;
 };
 

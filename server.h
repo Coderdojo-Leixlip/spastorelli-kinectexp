@@ -1,7 +1,9 @@
 #ifndef LPTC_CODERDOJO_SERVER_H_
 #define LPTC_CODERDOJO_SERVER_H_
 
+#include "channel.h"
 #include "device.h"
+#include "publisher.h"
 
 #include <future>
 #include <iostream>
@@ -39,26 +41,6 @@ class Command {
   std::string topic;
 };
 
-class Channel {
- public:
-  Channel(const std::string& t, AsioServer& s);
-  Channel(const Channel& ch);
-
-  const std::string& GetTopic() const;
-
-  void Publish(void const* data, size_t len);
-  void Subscribe(websocketpp::connection_hdl hdl);
-  void Unsubscribe(websocketpp::connection_hdl hdl);
-
- private:
-  std::string topic;
-  ConnectionSet subscribers;
-  std::mutex subscribers_lock;
-  AsioServer& server;
-};
-
-typedef std::function<bool(std::vector<uint8_t>&)> DataProducer;
-
 class BroadcastServer {
  public:
   BroadcastServer(lptc_coderdojo::KinectDevice& _device, const int _port);
@@ -67,16 +49,19 @@ class BroadcastServer {
   void Stop();
 
  private:
-  void BroadcastToChannel(const std::string ch_name, DataProducer producer);
+  void BroadcastToChannel(const std::string ch_name,
+                          lptc_coderdojo::Publisher& publisher);
   void CloseConnections(const std::string& reason);
-  Channel* GetChannel(const std::string& topic);
+  lptc_coderdojo::Channel* GetChannel(const std::string& topic);
   void OnConnectionClosed(websocketpp::connection_hdl hdl);
   void OnConnectionOpened(websocketpp::connection_hdl hdl);
   void OnMessage(websocketpp::connection_hdl hdl, AsioServer::message_ptr msg);
   void RegisterChannel(const std::string& name);
+  void SendErrorMessage(websocketpp::connection_hdl hdl,
+                        const std::string& error_msg);
   void StopAllChannelBroadcasts();
 
-  typedef std::map<std::string, Channel> ChannelMap;
+  typedef std::map<std::string, lptc_coderdojo::Channel> ChannelMap;
 
   const int port;
 

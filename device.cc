@@ -1,5 +1,7 @@
 #include "device.h"
 
+#include <functional>
+
 namespace lptc_coderdojo {
 
 const std::chrono::milliseconds kLockTimeout = std::chrono::milliseconds(30);
@@ -29,6 +31,7 @@ bool FrameQueue<T>::Pop(std::vector<T>& data,
   } else {
     return PopInternal(data);
   }
+  return false;
 }
 
 template <typename T>
@@ -56,22 +59,31 @@ OpenKinectDevice::OpenKinectDevice(freenect_context* ctx, int index)
 
 void OpenKinectDevice::DepthCallback(void* _depth, uint32_t timestamp) {
   uint16_t* depth = static_cast<uint16_t*>(_depth);
-
-  int frame_rect_size = depth_mode.width * depth_mode.height;
-  std::vector<uint8_t> frame =
-      ConvertDepthDataToGreyscale(depth, frame_rect_size);
-  depth_frames.Push(frame);
+  int len = GetDepthFrameRectSize();
+  std::vector<uint16_t> buf;
+  buf.resize(len);
+  std::copy(depth, depth + len, buf.begin());
+  depth_frames.Push(buf);
 }
 
 void OpenKinectDevice::VideoCallback(void* _video, uint32_t timestamp) {
   uint8_t* video = static_cast<uint8_t*>(_video);
-
-  int frame_rect_size = video_mode.width * video_mode.height;
-  std::vector<uint8_t> frame = ConvertVideoDataToRGBA(video, frame_rect_size);
-  video_frames.Push(frame);
+  int len = GetVideoFrameRectSize() * 3;
+  std::vector<uint8_t> buf;
+  buf.resize(len);
+  std::copy(video, video + len, buf.begin());
+  video_frames.Push(buf);
 }
 
-bool OpenKinectDevice::GetNextDepthFrame(std::vector<uint8_t>& frame) {
+int OpenKinectDevice::GetDepthFrameRectSize() {
+  return depth_mode.width * depth_mode.height;
+}
+
+int OpenKinectDevice::GetVideoFrameRectSize() {
+  return video_mode.width * video_mode.height;
+}
+
+bool OpenKinectDevice::GetNextDepthFrame(std::vector<uint16_t>& frame) {
   return depth_frames.Pop(frame, kLockTimeout);
 }
 
@@ -86,30 +98,5 @@ void OpenKinectDevice::StartVideo() { startVideo(); }
 void OpenKinectDevice::StopDepth() { stopDepth(); }
 
 void OpenKinectDevice::StopVideo() { stopVideo(); }
-
-std::vector<uint8_t> OpenKinectDevice::ConvertDepthDataToGreyscale(
-    uint16_t* depth, const int rect_size) {
-  std::vector<uint8_t> frame(rect_size * 4);
-  for (int i = 0; i < rect_size; i++) {
-    uint8_t val = (uint8_t)depth[i];
-    frame[i * 4] = 255 - val;
-    frame[i * 4 + 1] = 255 - val;
-    frame[i * 4 + 2] = 255 - val;
-    frame[i * 4 + 3] = 255;
-  }
-  return frame;
-}
-
-std::vector<uint8_t> OpenKinectDevice::ConvertVideoDataToRGBA(
-    uint8_t* video, const int rect_size) {
-  std::vector<uint8_t> frame(rect_size * 4);
-  for (int i = 0; i < rect_size; i++) {
-    frame[i * 4] = video[i * 3];
-    frame[i * 4 + 1] = video[i * 3 + 1];
-    frame[i * 4 + 2] = video[i * 3 + 2];
-    frame[i * 4 + 3] = 255;
-  }
-  return frame;
-}
 
 }  // namespace lptc_coderdojo

@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8"/>
   <link rel="stylesheet" href="style.css" type="text/css" />
+  <script src="flatbuffers.js"></script>
+  <script src="../protocol/protocol_generated.js"></script>
 </head>
 <body>
 <div class="container">
@@ -40,6 +42,7 @@
   var connected = false;
   var canvas = document.querySelector('canvas');
   var ws = new WebSocket("ws://localhost:9002");
+  var ctx = canvas.getContext("2d");
 
   var logToDebugConsole = function(data) {
     var msg = data.msg;
@@ -53,20 +56,43 @@
   };
 
   ws.binaryType = 'arraybuffer';
+
   ws.onopen = function() {
     connected = true;
     logToDebugConsole({msg: `✅ Connected to server.`, class: 'evt'});
   };
+
   ws.onmessage = function(msg) {
-    console.log(typeof msg.data);
-    if (typeof msg.data === "object") {
-      var imageData = new ImageData(new Uint8ClampedArray(msg.data), 640, 480);
-      var ctx = canvas.getContext("2d");
+    if (typeof msg.data !== "object") {
+      logToDebugConsole({msg: `❌  Unexpected WS data encoding`, class: 'itsvr'});
+      return;
+    }
+    const buf = new flatbuffers.ByteBuffer(new Uint8Array(msg.data));
+    const message = lptc_coderdojo.protocol.Message.getRootAsMessage(buf);
+    const timestamp = new Date(message.timestamp().toFloat64());
+    const messageType = message.type();
+
+    if (messageType === lptc_coderdojo.protocol.MessageType.DeviceData) {
+      canvas.width = canvas.width;
+      ctx.font = "20pt Quicksand";
+
+      const devData = message.data();
+      let imageData;
+      if (devData.type() === lptc_coderdojo.protocol.DataType.Depth) {
+        ctx.fillStyle = "orange";
+        imageData = new ImageData(new Uint8ClampedArray(devData.depthArray()), 640, 480);
+      } else if (devData.type() === lptc_coderdojo.protocol.DataType.Video) {
+        ctx.fillStyle = "green";
+        imageData = new ImageData(new Uint8ClampedArray(devData.videoArray()), 640, 480);
+      }
+
       ctx.putImageData(imageData, 0, 0);
-    } else {
-      logToDebugConsole({msg: `📥 < ${msg.data}`, class: 'itsvr'});
+      ctx.fillText(timestamp.toISOString(), 310, 465);
+    } else if (messageType === lptc_coderdojo.protocol.MessageType.Error) {
+      logToDebugConsole({msg: `📥 < ⚠️ [${timestamp.toISOString()}]: ${message.error()}`, class: 'itsvr'});
     }
   };
+
   ws.onclose = function(ev) {
     connected = false;
     logToDebugConsole({msg: `❌ Connection closed (code: ${ev.code})`, class: 'evt'});
