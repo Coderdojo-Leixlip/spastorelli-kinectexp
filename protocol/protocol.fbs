@@ -1,0 +1,26 @@
+namespace lptc_coderdojo.protocol;
+
+enum MessageType: uint8 {
+  Error = 0,
+  DeviceData = 1
+}
+
+enum DataType: uint8 {
+  Depth = 0,
+  Video = 1
+}
+
+table DeviceData {
+  type: DataType;
+  depth: [uint8];
+  video: [uint8];
+}
+
+table Message {
+  timestamp: ulong;
+  type: MessageType;
+  error: string;
+  data: DeviceData;
+}
+
+root_type Message;

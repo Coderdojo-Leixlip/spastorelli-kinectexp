@@ -7,7 +7,7 @@ FAKENECT_LIB=/usr/local/lib/fakenect/
 FAKENECT_TEST_DATA=test_data
 INCLUDES=-I ./libs/websocketpp/ `pkg-config --cflags libfreenect`
 BUILDDIR=build
-OBJS=$(addprefix $(BUILDDIR)/,run_server.o server.o device.o)
+OBJS=$(addprefix $(BUILDDIR)/,run_server.o server.o channel.o publisher.o device.o)
 BIN=$(addprefix $(BUILDDIR)/,kinect_serve)
 
 all: $(BIN)
@@ -15,7 +15,7 @@ all: $(BIN)
 $(BUILDDIR)/%.o: %.cc
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-$(BIN): $(OBJS)
+$(BIN): flatbuf-cpp $(OBJS)
 ifeq ($(FAKENECT),ON)
 	$(LD) $(CFLAGS) -L$(FAKENECT_LIB) $(LIBS) -o $(BIN) $(OBJS)
 else
@@ -33,6 +33,12 @@ ifeq ($(FAKENECT),ON)
 else
 	$(BIN)
 endif
+
+flatbuf-cpp:
+	flatc --cpp --scoped-enums -o protocol/ protocol/protocol.fbs
+
+flatbuf-js:
+	flatc --js -o protocol/ protocol/protocol.fbs
 
 fakenect: run FAKENECT=ON
 

@@ -1,4 +1,7 @@
 #include "server.h"
+#include "protocol/protocol_generated.h"
+
+#include <flatbuffers/flatbuffers.h>
 
 namespace lptc_coderdojo {
 
@@ -15,6 +18,7 @@ std::string Command::ActionStr(Action a) {
     case Action::UNSUBSCRIBE:
       return "UNSUBSCRIBE";
     case Action::INVALID:
+    default:
       return "INVALID";
   }
 }
@@ -50,41 +54,6 @@ Command Command::FromMessagePayload(const std::string& msg) {
   return Command(ActionFromToken(tokens[0]), tokens[1]);
 }
 
-Channel::Channel(const std::string& t, AsioServer& s) : topic(t), server(s) {}
-Channel::Channel(const Channel& ch) : topic(ch.topic), server(ch.server) {
-  std::lock_guard<std::mutex> guard(subscribers_lock);
-  subscribers = ch.subscribers;
-}
-
-const std::string& Channel::GetTopic() const { return topic; }
-
-void Channel::Publish(void const* data, size_t len) {
-  std::lock_guard<std::mutex> guard(subscribers_lock);
-
-  if (subscribers.empty()) {
-    return;
-  }
-
-  ConnectionSet::iterator iter;
-  for (iter = subscribers.begin(); iter != subscribers.end(); ++iter) {
-    try {
-      server.send(*iter, data, len, websocketpp::frame::opcode::binary);
-    } catch (websocketpp::exception const& e) {
-      std::cerr << "!!!Error: " << e.m_msg << std::endl;
-    }
-  }
-}
-
-void Channel::Subscribe(websocketpp::connection_hdl hdl) {
-  std::lock_guard<std::mutex> guard(subscribers_lock);
-  subscribers.insert(hdl);
-}
-
-void Channel::Unsubscribe(websocketpp::connection_hdl hdl) {
-  std::lock_guard<std::mutex> guard(subscribers_lock);
-  subscribers.erase(hdl);
-}
-
 BroadcastServer::BroadcastServer(lptc_coderdojo::KinectDevice& _device,
                                  const int _port)
     : port(_port), device(_device) {
@@ -100,9 +69,9 @@ BroadcastServer::BroadcastServer(lptc_coderdojo::KinectDevice& _device,
 }
 
 void BroadcastServer::BroadcastToChannel(const std::string ch_name,
-                                         DataProducer producer) {
+                                         lptc_coderdojo::Publisher& publisher) {
   std::cout << "Broadcasting to `" << ch_name << "` channel..." << std::endl;
-  Channel* ch = GetChannel(ch_name);
+  lptc_coderdojo::Channel* ch = GetChannel(ch_name);
   if (!ch) {
     std::cerr << "!!!Error: no matching channel." << std::endl;
     return;
@@ -110,10 +79,7 @@ void BroadcastServer::BroadcastToChannel(const std::string ch_name,
 
   while (term_future.wait_for(std::chrono::microseconds(1)) ==
          std::future_status::timeout) {
-    std::vector<uint8_t> frame;
-    if (producer(frame) && !frame.empty()) {
-      ch->Publish(frame.data(), frame.size());
-    }
+    publisher.PublishNewData(ch);
   }
   std::cout << "Stopped broadcasting to `" << ch_name << "` channel."
             << std::endl;
@@ -133,7 +99,7 @@ void BroadcastServer::CloseConnections(const std::string& reason) {
   }
 }
 
-Channel* BroadcastServer::GetChannel(const std::string& topic) {
+lptc_coderdojo::Channel* BroadcastServer::GetChannel(const std::string& topic) {
   ChannelMap::iterator search = channels.find(topic);
   if (search != channels.end()) return &search->second;
 
@@ -161,15 +127,13 @@ void BroadcastServer::OnMessage(websocketpp::connection_hdl hdl,
   Command::Action action = cmd.GetAction();
 
   if (action == Command::Action::INVALID) {
-    s.send(hdl, "Error: invalid command provided.",
-           websocketpp::frame::opcode::text);
+    SendErrorMessage(hdl, "Invalid command provided.");
     return;
   }
 
-  Channel* ch = GetChannel(cmd.GetTopic());
+  lptc_coderdojo::Channel* ch = GetChannel(cmd.GetTopic());
   if (!ch) {
-    s.send(hdl, "Error: no matching channel.",
-           websocketpp::frame::opcode::text);
+    SendErrorMessage(hdl, "No matching channel.");
     return;
   }
 
@@ -181,11 +145,32 @@ void BroadcastServer::OnMessage(websocketpp::connection_hdl hdl,
 }
 
 void BroadcastServer::RegisterChannel(const std::string& name) {
-  Channel ch(name, s);
+  lptc_coderdojo::Channel ch(name, s);
   channels.insert(ChannelMap::value_type(ch.GetTopic(), ch));
 }
 
 void BroadcastServer::StopAllChannelBroadcasts() { term_sig.set_value(); }
+
+void BroadcastServer::SendErrorMessage(websocketpp::connection_hdl hdl,
+                                       const std::string& error_msg) {
+  flatbuffers::FlatBufferBuilder builder;
+  flatbuffers::Offset<flatbuffers::String> error =
+      builder.CreateString(error_msg);
+
+  lptc_coderdojo::protocol::MessageBuilder msg_builder(builder);
+  msg_builder.add_type(lptc_coderdojo::protocol::MessageType::Error);
+  msg_builder.add_error(error);
+  msg_builder.add_timestamp(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count());
+  flatbuffers::Offset<lptc_coderdojo::protocol::Message> msg =
+      msg_builder.Finish();
+  builder.Finish(msg);
+
+  s.send(hdl, builder.GetBufferPointer(), builder.GetSize(),
+         websocketpp::frame::opcode::binary);
+}
 
 void BroadcastServer::Run() {
   s.listen(port);
@@ -197,19 +182,15 @@ void BroadcastServer::Run() {
 
   device.StartVideo();
   RegisterChannel("video");
-  DataProducer video_prod = [&](std::vector<uint8_t>& frame) -> bool {
-    return device.GetNextVideoFrame(frame);
-  };
+  lptc_coderdojo::VideoDataPublisher video_pub(device);
   std::thread video_broadcast_thread(std::bind(
-      &BroadcastServer::BroadcastToChannel, this, "video", video_prod));
+      &BroadcastServer::BroadcastToChannel, this, "video", video_pub));
 
   device.StartDepth();
   RegisterChannel("depth");
-  DataProducer depth_prod = [&](std::vector<uint8_t>& frame) -> bool {
-    return device.GetNextDepthFrame(frame);
-  };
+  lptc_coderdojo::DepthDataPublisher depth_pub(device);
   std::thread depth_broadcast_thread(std::bind(
-      &BroadcastServer::BroadcastToChannel, this, "depth", depth_prod));
+      &BroadcastServer::BroadcastToChannel, this, "depth", depth_pub));
 
   s.run();
   video_broadcast_thread.join();
@@ -224,7 +205,7 @@ void BroadcastServer::Stop() {
   device.StopDepth();
 
   std::cout << "Closing connections..." << std::endl;
-  CloseConnections("Shutting down server.");
+  CloseConnections("Goodbye!");
   std::cout << "Stopping channel broadcasts..." << std::endl;
   StopAllChannelBroadcasts();
 }
