@@ -3,68 +3,108 @@
 <head>
   <meta charset="utf-8"/>
   <link rel="stylesheet" href="style.css" type="text/css" />
+  <link rel="stylesheet" href="css/fa-all.min.css" type="text/css" />
   <script src="flatbuffers.js"></script>
   <script src="../protocol/protocol_generated.js"></script>
 </head>
 <body>
 <div class="container">
-  <div class="section header">
+  <div class="header">
       <span class="header-title">LPTC CoderDojo</span>
       <span class="header-logo"></span>
   </div>
-  <div class="section container">
-    <div class="section">
-      <canvas class="feed" width=640 height=480></canvas>
-    </div>
-    <div class="section">
-      <div class="container">
-        <div class="section">
-          <fieldset>
-            <div class="row">
-              <label for="topic">Topic ></label>
-              <input name="topic" id="topic" type="text" />
-            </div>
-            <button id="action">Subscribe</button>
-          </fieldset>
-        </div>
-        <div class="section">
-          <div class="debug"></div>
-        </div>
+  <div class="content">
+    <div class="panel">
+      <div class="panel-front">
+          <canvas class="screen" width=640 height=480></canvas>
       </div>
+      <div class="panel-back">
+        <div class="debug"></div>
+      </div>
+    </div>
+    <div class="controls">
+        <label class="prompt" for="cmd"><i class="fas fa-terminal"></i></label>
+        <input name="cmd" id="cmd" type="text" placeholder="SUBSCRIBE depth"/>
+        <div class="show-debug"><i class="fas fa-bug"></i></div>
+        <div class="led"></div>
+        <button id="action">Send</button>
     </div>
   </div>
 </div>
 <script>
   var actionButton = document.getElementById("action");
-  var topicInput = document.getElementById("topic");
-  var debugConsole = document.querySelector('.debug');
-  var feedOn = false;
+  var cmdInput = document.getElementById("cmd");
+  var debugConsole = document.querySelector(".debug");
+  var showDebug = document.querySelector(".show-debug");
+  var panel = document.querySelector(".panel");
   var connected = false;
-  var canvas = document.querySelector('canvas');
+  var streaming = false;
+  var connectionLed = document.querySelector(".led");
+  var canvas = document.querySelector("canvas");
   var ws = new WebSocket("ws://localhost:9002");
   var ctx = canvas.getContext("2d");
 
   var logToDebugConsole = function(data) {
     var msg = data.msg;
-    var cls = data.class || '';
-    var msgElem = document.createElement('div');
-    msgElem.className = 'debug-msg ' + cls;
-    msgElem.textContent = msg;
+    var cls = data.class || "";
+    var icons = data.icons || [];
+    var msgElem = document.createElement("div");
+
+    msgElem.className = "debug-msg " + cls;
+    icons.forEach(function(icon) {
+      var iconClass = icon.class || "";
+      var iconStyle = icon.style || "";
+
+      var iconSpan = document.createElement("span");
+      iconSpan.className = "debug-icon";
+      iconSpan.style = iconStyle;
+
+      var iconElem = document.createElement("i");
+      iconElem.className = "fas " + iconClass;
+      iconSpan.appendChild(iconElem);
+      msgElem.appendChild(iconSpan);
+    });
+
+    var txtElem = document.createTextNode(msg);
+    msgElem.appendChild(txtElem);
     debugConsole.appendChild(msgElem);
     debugConsole.scrollTop = debugConsole.scrollHeight;
+    showDebug.classList.add("beep");
     console.log(msg);
   };
 
-  ws.binaryType = 'arraybuffer';
+  cmdInput.addEventListener("keyup", function(evt) {
+    evt.preventDefault();
+    if (evt.keyCode === 13) {
+      actionButton.click();
+    }
+  });
+
+  showDebug.addEventListener("click", function() {
+    panel.classList.toggle('is-flipped');
+  });
+
+  showDebug.addEventListener("animationend", function() {
+    showDebug.classList.remove("beep");
+  }, false);
+
+  ws.binaryType = "arraybuffer";
 
   ws.onopen = function() {
     connected = true;
-    logToDebugConsole({msg: `✅ Connected to server.`, class: 'evt'});
+    connectionLed.className = "led connected";
+    logToDebugConsole({
+      icons: [{ class: "fa-check-circle", style: "color: green" }],
+      msg: `Connected to server.`
+    });
   };
 
   ws.onmessage = function(msg) {
     if (typeof msg.data !== "object") {
-      logToDebugConsole({msg: `❌  Unexpected WS data encoding`, class: 'itsvr'});
+      logToDebugConsole({
+        icons: [{ class: "fa-exclamation-circle", style: "color: red" }],
+        msg: `Unexpected WS data encoding`
+      });
       return;
     }
     const buf = new flatbuffers.ByteBuffer(new Uint8Array(msg.data));
@@ -73,46 +113,52 @@
     const messageType = message.type();
 
     if (messageType === lptc_coderdojo.protocol.MessageType.DeviceData) {
+      if (!streaming) {
+        streaming = true;
+        connectionLed.className = "led streaming";
+      }
+
       canvas.width = canvas.width;
-      ctx.font = "20pt Quicksand";
+      ctx.font = "15pt 'Courier New'";
+      ctx.fillStyle = "green";
 
       const devData = message.data();
       let imageData;
       if (devData.type() === lptc_coderdojo.protocol.DataType.Depth) {
-        ctx.fillStyle = "orange";
         imageData = new ImageData(new Uint8ClampedArray(devData.depthArray()), 640, 480);
       } else if (devData.type() === lptc_coderdojo.protocol.DataType.Video) {
-        ctx.fillStyle = "green";
         imageData = new ImageData(new Uint8ClampedArray(devData.videoArray()), 640, 480);
       }
 
       ctx.putImageData(imageData, 0, 0);
-      ctx.fillText(timestamp.toISOString(), 310, 465);
+      ctx.fillText(timestamp.toISOString(), 340, 465);
     } else if (messageType === lptc_coderdojo.protocol.MessageType.Error) {
-      logToDebugConsole({msg: `📥 < ⚠️ [${timestamp.toISOString()}]: ${message.error()}`, class: 'itsvr'});
+      logToDebugConsole({
+        icons: [
+          {class: "fa-reply"},
+          {class: "fa-exclamation-triangle", style: "color: yellow"}
+        ],
+        msg: `${message.error()}`
+      });
     }
   };
 
-  ws.onclose = function(ev) {
+  ws.onclose = function(evt) {
     connected = false;
-    logToDebugConsole({msg: `❌ Connection closed (code: ${ev.code})`, class: 'evt'});
+    connectionLed.className = "led off";
+    logToDebugConsole({
+      icons: [{class: "fa-times-circle", style: "color: red"}],
+      msg: `Connection closed (code: ${evt.code})`
+    });
   }
 
   actionButton.onclick = function() {
-    const topic = topicInput.value;
-    var command;
-    if (!feedOn) {
-      command = `SUBSCRIBE ${topic}`;
-      ws.send(command);
-      actionButton.textContent = "Unsubscribe";
-      feedOn = true;
-    } else {
-      command = `UNSUBSCRIBE ${topic}`;
-      ws.send(command);
-      actionButton.textContent = "Subscribe";
-      feedOn = false;
-    }
-    logToDebugConsole({msg: `📤 > ${command}`, class: 'clt'});
+    const command = cmdInput.value;
+    ws.send(command);
+    logToDebugConsole({
+      icons: [{class: "fa-terminal"}],
+      msg: `${command}`
+    });
   }
 </script>
 </body>
