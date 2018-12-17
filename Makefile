@@ -6,27 +6,46 @@ FAKENECT=OFF
 FAKENECT_LIB=/usr/local/lib/fakenect/
 FAKENECT_TEST_DATA=test_data
 INCLUDES=-I ./libs/websocketpp/ `pkg-config --cflags libfreenect`
-BUILDDIR=build
-SRCDIR=src
-OBJS=$(addprefix $(BUILDDIR)/,run_server.o server.o channel.o publisher.o device.o)
-BIN=$(addprefix $(BUILDDIR)/,kinect_serve)
+BUILD_DIR=build
+BUILD_BIN_DIR=$(BUILD_DIR)/bin
+BUILD_LIBS_DIR=$(BUILD_DIR)/libs
+BUILD_TESTS_DIR=$(BUILD_DIR)/tests
+SRC_DIR=src
+TESTS_DIR=tests
+GTEST_SRC_DIR=libs/googletest/googletest
+GTEST_LIB=$(BUILD_LIBS_DIR)/libgtest.a
+OBJS=$(addprefix $(BUILD_LIBS_DIR)/,run_server.o server.o channel.o publisher.o device.o)
+TESTS=$(addprefix $(BUILD_TESTS_DIR)/,sample_test)
+BIN=$(addprefix $(BUILD_BIN_DIR)/,kinect_serve)
 
 all: $(BIN)
 
-$(BUILDDIR)/%.o: $(SRCDIR)/%.cc
+$(BUILD_LIBS_DIR)/%.o: $(SRC_DIR)/%.cc
+	mkdir -p $(BUILD_LIBS_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-$(BIN): flatbuf-cpp $(OBJS)
+$(BIN): $(OBJS)
+	mkdir -p $(BUILD_BIN_DIR)
 ifeq ($(FAKENECT),ON)
 	$(LD) $(CFLAGS) -L$(FAKENECT_LIB) $(LIBS) -o $(BIN) $(OBJS)
 else
 	$(LD) $(CFLAGS) $(LIBS) -o $(BIN) $(OBJS)
 endif
 
-$(OBJS): | $(BUILDDIR)
+$(OBJS): | flatbuf-cpp
 
-$(BUILDDIR):
-	mkdir -p $(BUILDDIR)
+$(BUILD_TESTS_DIR)/%_test: $(TESTS_DIR)/%_test.cc
+	mkdir -p $(BUILD_TESTS_DIR)
+	$(CC) $(CFLAGS) -isystem $(GTEST_SRC_DIR)/include -pthread $(GTEST_LIB) \
+		-o $@ $<
+
+$(GTEST_LIB):
+	mkdir -p $(BUILD_LIBS_DIR)
+	$(CC) $(CFLAGS) -isystem $(GTEST_SRC_DIR)/include -I$(GTEST_SRC_DIR) \
+		-pthread -c $(GTEST_SRC_DIR)/src/gtest-all.cc -o $(BUILD_LIBS_DIR)/gtest-all.o
+	ar -rv $(GTEST_LIB) $(BUILD_LIBS_DIR)/gtest-all.o
+
+$(TESTS): $(GTEST_LIB)
 
 run: $(BIN)
 ifeq ($(FAKENECT),ON)
@@ -34,6 +53,11 @@ ifeq ($(FAKENECT),ON)
 else
 	$(BIN)
 endif
+
+run-tests: $(TESTS)
+	$(TESTS)
+
+tests: $(TESTS)
 
 flatbuf-cpp:
 	flatc --cpp --scoped-enums -o protocol/ protocol/protocol.fbs
@@ -47,4 +71,4 @@ format:
 	clang-format -style=file -i *.cc *.h
 
 clean:
-	rm -rf $(BUILDDIR)/*.o $(BIN)
+	rm -rf $(BUILD_DIR)
