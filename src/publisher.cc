@@ -1,5 +1,5 @@
 #include "publisher.h"
-#include "protocol/protocol_generated.h"
+#include "../protocol/protocol_generated.h"
 
 #include <flatbuffers/flatbuffers.h>
 

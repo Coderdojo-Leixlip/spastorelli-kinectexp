@@ -7,12 +7,13 @@ FAKENECT_LIB=/usr/local/lib/fakenect/
 FAKENECT_TEST_DATA=test_data
 INCLUDES=-I ./libs/websocketpp/ `pkg-config --cflags libfreenect`
 BUILDDIR=build
+SRCDIR=src
 OBJS=$(addprefix $(BUILDDIR)/,run_server.o server.o channel.o publisher.o device.o)
 BIN=$(addprefix $(BUILDDIR)/,kinect_serve)
 
 all: $(BIN)
 
-$(BUILDDIR)/%.o: %.cc
+$(BUILDDIR)/%.o: $(SRCDIR)/%.cc
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 $(BIN): flatbuf-cpp $(OBJS)
