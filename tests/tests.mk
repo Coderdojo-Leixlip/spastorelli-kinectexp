@@ -1,3 +1,3 @@
-TESTS=server_test sample_test
-server_test_OBJS=$(addprefix $(BUILD_LIBS_DIR)/,server_test.o server.o channel.o publisher.o device.o)
+TESTS=command_test sample_test
+command_test_OBJS=$(addprefix $(BUILD_LIBS_DIR)/,command_test.o command.o)
 sample_test_OBJS=$(addprefix $(BUILD_LIBS_DIR)/,sample_test.o)

@@ -29,7 +29,7 @@ DEPFLAGS= -MT $@ -MMD -MP -MF $(BUILD_DEPS_DIR)/$*.Td
 COMPILE.cc=$(CC) $(DEPFLAGS) $(CFLAGS) -c
 POSTCOMPILE=@(mv -f $(BUILD_DEPS_DIR)/$*.Td $(BUILD_DEPS_DIR)/$*.d && touch $@)
 
-BIN_OBJS=$(addprefix $(BUILD_LIBS_DIR)/,run_server.o server.o channel.o publisher.o device.o)
+BIN_OBJS=$(addprefix $(BUILD_LIBS_DIR)/,run_server.o server.o channel.o command.o publisher.o device.o)
 BIN=$(addprefix $(BUILD_BIN_DIR)/,kinect_serve)
 
 FAKENECT=OFF
