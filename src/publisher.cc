@@ -42,8 +42,7 @@ std::tuple<uint8_t*, size_t> SerializeMessage(
 namespace lptc_coderdojo {
 
 DepthDataPublisher::DepthDataPublisher(lptc_coderdojo::KinectDevice& _device)
-    : device(_device),
-      frame(_device.GetDepthFrameRectSize() * 4) {}
+    : device(_device), frame(_device.GetDepthFrameRectSize() * 4) {}
 
 void DepthDataPublisher::PublishNewData(lptc_coderdojo::Channel* channel) {
   if (!device.GetNextDepthFrame(buf)) return;
@@ -68,8 +67,7 @@ void DepthDataPublisher::Transform() {
 }
 
 VideoDataPublisher::VideoDataPublisher(lptc_coderdojo::KinectDevice& _device)
-    : device(_device),
-      frame(_device.GetVideoFrameRectSize() * 4) {}
+    : device(_device), frame(_device.GetVideoFrameRectSize() * 4) {}
 
 void VideoDataPublisher::PublishNewData(lptc_coderdojo::Channel* channel) {
   if (!device.GetNextVideoFrame(buf)) return;
