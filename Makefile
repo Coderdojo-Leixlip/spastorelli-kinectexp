@@ -1,6 +1,6 @@
 CC=clang++
 LD=clang++
-CFLAGS=-O2 -g -Wall -std=c++11 -stdlib=libc++
+OPTIMIZER_OPTS=-O2
 LIBS=-lboost_system
 INCLUDES=-I ./libs/websocketpp/ `pkg-config --cflags libfreenect`
 GTEST_SRC_DIR=libs/googletest/googletest
@@ -11,25 +11,34 @@ TESTS_DIR=tests
 PROTO_DIR=protocol
 BUILD_DIR=build
 BUILD_BIN_DIR=$(BUILD_DIR)/bin
+BUILD_COVERAGE_DIR=$(BUILD_DIR)/coverage
 BUILD_DEPS_DIR=$(BUILD_DIR)/deps
 BUILD_LIBS_DIR=$(BUILD_DIR)/libs
 BUILD_TESTS_DIR=$(BUILD_DIR)/tests
 
-$(shell mkdir -p $(BUILD_BIN_DIR) > /dev/null)
-$(shell mkdir -p $(BUILD_DEPS_DIR) > /dev/null)
-$(shell mkdir -p $(BUILD_LIBS_DIR) > /dev/null)
-$(shell mkdir -p $(BUILD_TESTS_DIR) > /dev/null)
+$(shell mkdir -p $(BUILD_BIN_DIR) $(BUILD_COVERAGE_DIR) $(BUILD_DEPS_DIR) \
+		$(BUILD_LIBS_DIR) $(BUILD_TESTS_DIR) \
+> /dev/null)
 SRCS=$(wildcard $(SRC_DIR)/*.cc)
 SRCS+=$(wildcard $(TESTS_DIR)/*.cc)
 HEADERS=$(wildcard $(SRC_DIR)/*.h)
 HEADERS+=$(wildcard $(TESTS_DIR)/*.h)
 INCLUDES+=-I $(SRC_DIR)
 
+COVERAGE=OFF
+ifeq ($(COVERAGE), ON)
+	COVERAGE_FLAGS=--coverage
+	OPTIMIZER_OPTS=-O0
+endif
+CFLAGS=$(OPTIMIZER_OPTS) -g -Wall -std=c++11 -stdlib=libc++
 DEPFLAGS= -MT $@ -MMD -MP -MF $(BUILD_DEPS_DIR)/$*.Td
 COMPILE.cc=$(CC) $(DEPFLAGS) $(CFLAGS) -c
 POSTCOMPILE=@(mv -f $(BUILD_DEPS_DIR)/$*.Td $(BUILD_DEPS_DIR)/$*.d && touch $@)
+LINK.cc=$(LD) $(CFLAGS) $(LIBS)
 
-BIN_OBJS=$(addprefix $(BUILD_LIBS_DIR)/,run_server.o server.o channel.o command.o publisher.o device.o)
+BIN_OBJS=$(addprefix $(BUILD_LIBS_DIR)/, \
+	run_server.o server.o channel.o \
+	command.o publisher.o device.o)
 BIN=$(addprefix $(BUILD_BIN_DIR)/,kinect_serve)
 
 FAKENECT=OFF
@@ -47,27 +56,27 @@ endif
 
 include $(TESTS_DIR)/tests.mk
 
-all: $(BIN)
+all: $(BIN) $(TESTS)
 
 $(BUILD_LIBS_DIR)/%_test.o: $(TESTS_DIR)/%_test.cc
 $(BUILD_LIBS_DIR)/%_test.o: $(TESTS_DIR)/%_test.cc \
 														$(BUILD_DEPS_DIR)/%_test.d
-	$(COMPILE.cc) $(INCLUDES) $(GTEST_INCLUDES) $(OUTPUT_OPTION) $<
+	$(COMPILE.cc) $(COVERAGE_FLAGS) $(INCLUDES) $(GTEST_INCLUDES) $(OUTPUT_OPTION) $<
 	$(POSTCOMPILE)
 
 $(BUILD_LIBS_DIR)/%.o: $(SRC_DIR)/%.cc
 $(BUILD_LIBS_DIR)/%.o: $(SRC_DIR)/%.cc $(BUILD_DEPS_DIR)/%.d
-	$(COMPILE.cc) $(INCLUDES) $(OUTPUT_OPTION) $<
+	$(COMPILE.cc) $(COVERAGE_FLAGS) $(INCLUDES) $(OUTPUT_OPTION) $<
 	$(POSTCOMPILE)
 
 $(BIN): $(BIN_OBJS)
-	$(LD) $(CFLAGS) $(LIBS) -o $(BIN) $(BIN_OBJS)
+	$(LINK.cc) $(COVERAGE_FLAGS) -o $(BIN) $(BIN_OBJS)
 
 $(BIN_OBJS): $(PROTO_DIR)/protocol_generated.h
 
 .SECONDEXPANSION:
 $(TESTS): $$($$@_OBJS) $(BUILD_LIBS_DIR)/gtest-main.a
-	$(LD) $(CFLAGS) $(LIBS) -lpthread \
+	$(LINK.cc) $(COVERAGE_FLAGS) -lpthread \
 		-o $(addprefix $(BUILD_TESTS_DIR)/,$@) $^
 
 $(BUILD_LIBS_DIR)/gtest-all.o:
@@ -79,16 +88,23 @@ $(BUILD_LIBS_DIR)/gtest-main.o:
 		-c $(GTEST_SRC_DIR)/src/gtest_main.cc -o $@
 
 $(BUILD_LIBS_DIR)/gtest.a: $(BUILD_LIBS_DIR)/gtest-all.o
-	ar -rv $@ $<
+	$(AR) -rv $@ $<
 
 $(BUILD_LIBS_DIR)/gtest-main.a: $(BUILD_LIBS_DIR)/gtest-all.o \
 																$(BUILD_LIBS_DIR)/gtest-main.o
-	ar -rv $@ $^
+	$(AR) -rv $@ $^
 
 run: $(BIN)
 	$(BIN_VARS) $(BIN)
 
-tests: $(TESTS)
+run-tests: $(TESTS)
+	$(foreach TEST,$(TESTS), \
+		echo "\nRunnning $(TEST)..." ; \
+		./$(BUILD_TESTS_DIR)/$(TEST) ; \
+	)
+
+coverage:
+	./coverage.sh
 
 fakenect: run FAKENECT=ON
 
