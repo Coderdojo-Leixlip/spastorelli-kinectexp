@@ -6,9 +6,7 @@
 #include "publisher.h"
 
 #include <future>
-#include <iostream>
 #include <set>
-#include <vector>
 
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
@@ -19,27 +17,6 @@ typedef websocketpp::server<websocketpp::config::asio> AsioServer;
 typedef std::set<websocketpp::connection_hdl,
                  std::owner_less<websocketpp::connection_hdl>>
     ConnectionSet;
-
-class Command {
- public:
-  enum Action { SUBSCRIBE, UNSUBSCRIBE, INVALID };
-
-  Command(Action a);
-  Command(Action a, const std::string t);
-
-  const Action& GetAction() const;
-  const std::string& GetTopic() const;
-
-  static std::string ActionStr(Action a);
-  static Action ActionFromToken(const std::string& token);
-  static std::vector<std::string> GetTokensFromPayload(
-      const std::string& msg_payload);
-  static Command FromMessagePayload(const std::string& msg);
-
- private:
-  Action action;
-  std::string topic;
-};
 
 class BroadcastServer {
  public:
