@@ -4,3 +4,6 @@
 [submodule "libs/googletest"]
 	path = libs/googletest
 	url = https://github.com/google/googletest
+[submodule "libs/OpenNI2"]
+	path = libs/OpenNI2
+	url = https://github.com/spastorelli/OpenNI2
