@@ -38,7 +38,7 @@ LINK.cc=$(LD) $(CFLAGS) $(LIBS)
 
 BIN_OBJS=$(addprefix $(BUILD_LIBS_DIR)/, \
 	run_server.o server.o channel.o \
-	command.o publisher.o device.o)
+	command.o publisher.o openkinect_device.o)
 BIN=$(addprefix $(BUILD_BIN_DIR)/,kinect_serve)
 
 FAKENECT=OFF

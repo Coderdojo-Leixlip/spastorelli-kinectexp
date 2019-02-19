@@ -1,3 +1,4 @@
+#include "openkinect_device.h"
 #include "server.h"
 
 namespace {
