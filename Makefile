@@ -17,7 +17,7 @@ BUILD_LIBS_DIR=$(BUILD_DIR)/libs
 BUILD_TESTS_DIR=$(BUILD_DIR)/tests
 
 $(shell mkdir -p $(BUILD_BIN_DIR) $(BUILD_COVERAGE_DIR) $(BUILD_DEPS_DIR) \
-		$(BUILD_LIBS_DIR) $(BUILD_TESTS_DIR) \
+	$(BUILD_LIBS_DIR) $(BUILD_TESTS_DIR) \
 > /dev/null)
 SRCS=$(wildcard $(SRC_DIR)/*.cc)
 SRCS+=$(wildcard $(TESTS_DIR)/*.cc)
@@ -30,8 +30,17 @@ ifeq ($(COVERAGE), ON)
 	COVERAGE_FLAGS=--coverage
 	OPTIMIZER_OPTS=-O0
 endif
-CFLAGS=$(OPTIMIZER_OPTS) -g -Wall -std=c++11 -stdlib=libc++
+
+SANITIZER=OFF
+ifeq ($(SANITIZER), ON)
+	SANITIZER_FLAGS=-fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls
+	OPTIMIZER_OPTS=-O1
+endif
+
+CFLAGS=-g -Wall -std=c++11 -stdlib=libc++
+CFLAGS+=$(OPTIMIZER_OPTS) $(SANITIZER_FLAGS) $(COVERAGE_FLAGS)
 DEPFLAGS= -MT $@ -MMD -MP -MF $(BUILD_DEPS_DIR)/$*.Td
+
 COMPILE.cc=$(CC) $(DEPFLAGS) $(CFLAGS) -c
 POSTCOMPILE=@(mv -f $(BUILD_DEPS_DIR)/$*.Td $(BUILD_DEPS_DIR)/$*.d && touch $@)
 LINK.cc=$(LD) $(CFLAGS) $(LIBS)
@@ -59,14 +68,13 @@ include $(TESTS_DIR)/tests.mk
 all: $(BIN) $(TESTS)
 
 $(BUILD_LIBS_DIR)/%_test.o: $(TESTS_DIR)/%_test.cc
-$(BUILD_LIBS_DIR)/%_test.o: $(TESTS_DIR)/%_test.cc \
-														$(BUILD_DEPS_DIR)/%_test.d
-	$(COMPILE.cc) $(COVERAGE_FLAGS) $(INCLUDES) $(GTEST_INCLUDES) $(OUTPUT_OPTION) $<
+$(BUILD_LIBS_DIR)/%_test.o: $(TESTS_DIR)/%_test.cc $(BUILD_DEPS_DIR)/%_test.d
+	$(COMPILE.cc) $(INCLUDES) $(GTEST_INCLUDES) $(OUTPUT_OPTION) $<
 	$(POSTCOMPILE)
 
 $(BUILD_LIBS_DIR)/%.o: $(SRC_DIR)/%.cc
 $(BUILD_LIBS_DIR)/%.o: $(SRC_DIR)/%.cc $(BUILD_DEPS_DIR)/%.d
-	$(COMPILE.cc) $(COVERAGE_FLAGS) $(INCLUDES) $(OUTPUT_OPTION) $<
+	$(COMPILE.cc) $(INCLUDES) $(OUTPUT_OPTION) $<
 	$(POSTCOMPILE)
 
 $(BIN): $(BIN_OBJS)
@@ -76,7 +84,7 @@ $(BIN_OBJS): $(PROTO_DIR)/protocol_generated.h
 
 .SECONDEXPANSION:
 $(TESTS): $$($$@_OBJS) $(BUILD_LIBS_DIR)/gtest-main.a
-	$(LINK.cc) $(COVERAGE_FLAGS) -lpthread \
+	$(LINK.cc) -lpthread \
 		-o $(addprefix $(BUILD_TESTS_DIR)/,$@) $^
 
 $(BUILD_LIBS_DIR)/gtest-all.o:
@@ -91,7 +99,7 @@ $(BUILD_LIBS_DIR)/gtest.a: $(BUILD_LIBS_DIR)/gtest-all.o
 	$(AR) -rv $@ $<
 
 $(BUILD_LIBS_DIR)/gtest-main.a: $(BUILD_LIBS_DIR)/gtest-all.o \
-																$(BUILD_LIBS_DIR)/gtest-main.o
+		$(BUILD_LIBS_DIR)/gtest-main.o
 	$(AR) -rv $@ $^
 
 run: $(BIN)
