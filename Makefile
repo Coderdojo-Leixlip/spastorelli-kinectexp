@@ -25,6 +25,8 @@ HEADERS=$(wildcard $(SRC_DIR)/*.h)
 HEADERS+=$(wildcard $(TESTS_DIR)/*.h)
 INCLUDES+=-I $(SRC_DIR)
 
+LD_RPATHS=-rpath,$(PWD)/$(BUILD_LIBS_DIR)
+
 COVERAGE=OFF
 ifeq ($(COVERAGE), ON)
 	COVERAGE_FLAGS=--coverage
@@ -43,7 +45,7 @@ DEPFLAGS= -MT $@ -MMD -MP -MF $(BUILD_DEPS_DIR)/$*.Td
 
 COMPILE.cc=$(CC) $(DEPFLAGS) $(CFLAGS) -c
 POSTCOMPILE=@(mv -f $(BUILD_DEPS_DIR)/$*.Td $(BUILD_DEPS_DIR)/$*.d && touch $@)
-LINK.cc=$(LD) $(CFLAGS) $(LIBS)
+LINK.cc=$(LD) $(CFLAGS) -Wl,$(LD_RPATHS) $(LIBS)
 
 BIN_OBJS=$(addprefix $(BUILD_LIBS_DIR)/, \
 	run_server.o server.o channel.o \
