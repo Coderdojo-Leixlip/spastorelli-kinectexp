@@ -2,3 +2,4 @@ build/**/*
 profiling/**/*
 test_data/*
 .vscode/*
+build_deps.log
