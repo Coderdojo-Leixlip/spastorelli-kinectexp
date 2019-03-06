@@ -1,5 +1,6 @@
-#include "openkinect_device.h"
 #include "server.h"
+
+#include "device.h"
 
 namespace {
 volatile std::sig_atomic_t sig_status;
@@ -16,10 +17,8 @@ int main() {
   std::signal(SIGINT, SignalHandler);
   std::signal(SIGTERM, SignalHandler);
 
-  Freenect::Freenect freenect;
-  lptc_coderdojo::KinectDevice& device =
-      freenect.createDevice<lptc_coderdojo::OpenKinectDevice>(0);
-
-  kserver = new lptc_coderdojo::BroadcastServer(device, 9002);
+  lptc_coderdojo::KinectDeviceProxy* device =
+      lptc_coderdojo::CreateKinectDeviceProxy(0);
+  kserver = new lptc_coderdojo::BroadcastServer(*device, 9002);
   kserver->Run();
 }

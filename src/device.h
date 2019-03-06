@@ -5,10 +5,9 @@
 
 namespace lptc_coderdojo {
 
-class KinectDevice {
+class KinectDeviceProxy {
  public:
-  KinectDevice() = default;
-  virtual ~KinectDevice() = default;
+  virtual ~KinectDeviceProxy() = default;
 
   virtual int GetDepthFrameRectSize() = 0;
   virtual int GetVideoFrameRectSize() = 0;
@@ -19,6 +18,8 @@ class KinectDevice {
   virtual void StopVideo() = 0;
   virtual void StopDepth() = 0;
 };
+
+KinectDeviceProxy* CreateKinectDeviceProxy(int index);
 
 }  // namespace lptc_coderdojo
 

@@ -1,5 +1,3 @@
-#include "frame_queue.h"
-
 #include "openkinect_device.h"
 
 namespace lptc_coderdojo {
@@ -19,20 +17,22 @@ OpenKinectDevice::OpenKinectDevice(freenect_context* ctx, int index)
 
 void OpenKinectDevice::DepthCallback(void* _depth, uint32_t timestamp) {
   uint16_t* depth = static_cast<uint16_t*>(_depth);
-  int len = GetDepthFrameRectSize();
-  std::vector<uint16_t> buf;
-  buf.resize(len);
-  std::copy(depth, depth + len, buf.begin());
-  depth_frames.Push(buf);
+  int size = GetDepthFrameRectSize();
+  if (depth_buf.size() != size) {
+    depth_buf.resize(size);
+  }
+  std::copy(depth, depth + size, depth_buf.begin());
+  depth_frames.Push(depth_buf);
 }
 
 void OpenKinectDevice::VideoCallback(void* _video, uint32_t timestamp) {
   uint8_t* video = static_cast<uint8_t*>(_video);
-  int len = GetVideoFrameRectSize() * 3;
-  std::vector<uint8_t> buf;
-  buf.resize(len);
-  std::copy(video, video + len, buf.begin());
-  video_frames.Push(buf);
+  int size = GetVideoFrameRectSize() * 3;
+  if (video_buf.size() != size) {
+    video_buf.resize(size);
+  }
+  std::copy(video, video + size, video_buf.begin());
+  video_frames.Push(video_buf);
 }
 
 int OpenKinectDevice::GetDepthFrameRectSize() {
@@ -43,20 +43,44 @@ int OpenKinectDevice::GetVideoFrameRectSize() {
   return video_mode.width * video_mode.height;
 }
 
-bool OpenKinectDevice::GetNextDepthFrame(std::vector<uint16_t>& frame) {
-  return depth_frames.Pop(frame, kLockTimeout);
+FrameQueue<uint16_t>& OpenKinectDevice::GetDepthFrameQueue() {
+  return depth_frames;
 }
 
-bool OpenKinectDevice::GetNextVideoFrame(std::vector<uint8_t>& frame) {
-  return video_frames.Pop(frame, kLockTimeout);
+FrameQueue<uint8_t>& OpenKinectDevice::GetVideoFrameQueue() {
+  return video_frames;
 }
 
-void OpenKinectDevice::StartDepth() { startDepth(); }
+OpenKinectDeviceProxy::OpenKinectDeviceProxy(int index) {
+  device = &freenect.createDevice<OpenKinectDevice>(index);
+}
 
-void OpenKinectDevice::StartVideo() { startVideo(); }
+int OpenKinectDeviceProxy::GetDepthFrameRectSize() {
+  return device->GetDepthFrameRectSize();
+}
 
-void OpenKinectDevice::StopDepth() { stopDepth(); }
+int OpenKinectDeviceProxy::GetVideoFrameRectSize() {
+  return device->GetVideoFrameRectSize();
+}
 
-void OpenKinectDevice::StopVideo() { stopVideo(); }
+bool OpenKinectDeviceProxy::GetNextDepthFrame(std::vector<uint16_t>& frame) {
+  return device->GetDepthFrameQueue().Pop(frame, kLockTimeout);
+}
+
+bool OpenKinectDeviceProxy::GetNextVideoFrame(std::vector<uint8_t>& frame) {
+  return device->GetVideoFrameQueue().Pop(frame, kLockTimeout);
+}
+
+void OpenKinectDeviceProxy::StartDepth() { device->startDepth(); }
+
+void OpenKinectDeviceProxy::StartVideo() { device->startVideo(); }
+
+void OpenKinectDeviceProxy::StopDepth() { device->stopDepth(); }
+
+void OpenKinectDeviceProxy::StopVideo() { device->stopVideo(); }
+
+KinectDeviceProxy* CreateKinectDeviceProxy(int index) {
+  return new OpenKinectDeviceProxy(index);
+}
 
 }  // namespace lptc_coderdojo

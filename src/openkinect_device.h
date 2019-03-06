@@ -8,12 +8,32 @@
 
 namespace lptc_coderdojo {
 
-class OpenKinectDevice : public KinectDevice, public Freenect::FreenectDevice {
+class OpenKinectDevice : public Freenect::FreenectDevice {
  public:
   OpenKinectDevice(freenect_context* ctx, int index);
 
   void DepthCallback(void* _depth, uint32_t timestamp);
   void VideoCallback(void* _rgb, uint32_t timestamp);
+
+  int GetDepthFrameRectSize();
+  int GetVideoFrameRectSize();
+  FrameQueue<uint16_t>& GetDepthFrameQueue();
+  FrameQueue<uint8_t>& GetVideoFrameQueue();
+
+ private:
+  freenect_frame_mode depth_mode;
+  freenect_frame_mode video_mode;
+
+  FrameQueue<uint16_t> depth_frames;
+  std::vector<uint16_t> depth_buf;
+
+  FrameQueue<uint8_t> video_frames;
+  std::vector<uint8_t> video_buf;
+};
+
+class OpenKinectDeviceProxy : public KinectDeviceProxy {
+ public:
+  OpenKinectDeviceProxy(int index);
 
   int GetDepthFrameRectSize();
   int GetVideoFrameRectSize();
@@ -25,11 +45,8 @@ class OpenKinectDevice : public KinectDevice, public Freenect::FreenectDevice {
   void StopVideo();
 
  private:
-  freenect_frame_mode depth_mode;
-  freenect_frame_mode video_mode;
-
-  FrameQueue<uint16_t> depth_frames;
-  FrameQueue<uint8_t> video_frames;
+  Freenect::Freenect freenect;
+  OpenKinectDevice* device;
 };
 
 }  // namespace lptc_coderdojo
