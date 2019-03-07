@@ -33,16 +33,16 @@ class OpenKinectDevice : public Freenect::FreenectDevice {
 
 class OpenKinectDeviceProxy : public KinectDeviceProxy {
  public:
-  OpenKinectDeviceProxy(int index);
+  OpenKinectDeviceProxy(int index) throw(KinectDeviceException);
 
   int GetDepthFrameRectSize();
   int GetVideoFrameRectSize();
   bool GetNextDepthFrame(std::vector<uint16_t>&);
   bool GetNextVideoFrame(std::vector<uint8_t>&);
-  void StartDepth();
-  void StartVideo();
-  void StopDepth();
-  void StopVideo();
+  void StartDepth() throw(KinectDeviceException);
+  void StartVideo() throw(KinectDeviceException);
+  void StopDepth() throw(KinectDeviceException);
+  void StopVideo() throw(KinectDeviceException);
 
  private:
   Freenect::Freenect freenect;

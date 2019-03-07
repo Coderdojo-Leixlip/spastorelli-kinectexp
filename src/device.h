@@ -1,6 +1,7 @@
 #ifndef LPTC_CODERDOJO_DEVICE_H_
 #define LPTC_CODERDOJO_DEVICE_H_
 
+#include <sstream>
 #include <vector>
 
 namespace lptc_coderdojo {
@@ -19,7 +20,28 @@ class KinectDeviceProxy {
   virtual void StopDepth() = 0;
 };
 
-KinectDeviceProxy* CreateKinectDeviceProxy(int index);
+class KinectDeviceException : public std::exception {
+ public:
+  KinectDeviceException(const std::string& ctx, const std::string& msg) throw()
+      : context(ctx), message(msg) {
+    std::stringstream sstream;
+    sstream << context << " failed:" << std::endl << message << std::endl;
+    description = sstream.str();
+  }
+  virtual ~KinectDeviceException() throw() {}
+
+  const std::string& getContext() const throw() { return context; }
+  const std::string& getMessage() const throw() { return message; }
+  const char* what() const throw() { return description.c_str(); }
+
+ private:
+  std::string context;
+  std::string message;
+  std::string description;
+};
+
+std::unique_ptr<KinectDeviceProxy> CreateKinectDeviceProxy(int index) throw(
+    KinectDeviceException);
 
 }  // namespace lptc_coderdojo
 

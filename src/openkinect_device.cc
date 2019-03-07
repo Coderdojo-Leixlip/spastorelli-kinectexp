@@ -1,5 +1,7 @@
 #include "openkinect_device.h"
 
+#include <memory>
+
 namespace lptc_coderdojo {
 
 const std::chrono::milliseconds kLockTimeout = std::chrono::milliseconds(30);
@@ -51,8 +53,13 @@ FrameQueue<uint8_t>& OpenKinectDevice::GetVideoFrameQueue() {
   return video_frames;
 }
 
-OpenKinectDeviceProxy::OpenKinectDeviceProxy(int index) {
-  device = &freenect.createDevice<OpenKinectDevice>(index);
+OpenKinectDeviceProxy::OpenKinectDeviceProxy(int index) throw(
+    KinectDeviceException) {
+  try {
+    device = &freenect.createDevice<OpenKinectDevice>(index);
+  } catch (const std::runtime_error& e) {
+    throw KinectDeviceException("OpenKinect device creation", e.what());
+  }
 }
 
 int OpenKinectDeviceProxy::GetDepthFrameRectSize() {
@@ -71,16 +78,41 @@ bool OpenKinectDeviceProxy::GetNextVideoFrame(std::vector<uint8_t>& frame) {
   return device->GetVideoFrameQueue().Pop(frame, kLockTimeout);
 }
 
-void OpenKinectDeviceProxy::StartDepth() { device->startDepth(); }
+void OpenKinectDeviceProxy::StartDepth() throw(KinectDeviceException) {
+  try {
+    device->startDepth();
+  } catch (const std::runtime_error& e) {
+    throw KinectDeviceException("OpenKinectDeviceProxy::StartDepth", e.what());
+  }
+}
 
-void OpenKinectDeviceProxy::StartVideo() { device->startVideo(); }
+void OpenKinectDeviceProxy::StartVideo() throw(KinectDeviceException) {
+  try {
+    device->startVideo();
+  } catch (const std::runtime_error& e) {
+    throw KinectDeviceException("OpenKinectDeviceProxy::StartVideo", e.what());
+  }
+}
 
-void OpenKinectDeviceProxy::StopDepth() { device->stopDepth(); }
+void OpenKinectDeviceProxy::StopDepth() throw(KinectDeviceException) {
+  try {
+    device->stopDepth();
+  } catch (const std::runtime_error& e) {
+    throw KinectDeviceException("OpenKinectDeviceProxy::StopDepth", e.what());
+  }
+}
 
-void OpenKinectDeviceProxy::StopVideo() { device->stopVideo(); }
+void OpenKinectDeviceProxy::StopVideo() throw(KinectDeviceException) {
+  try {
+    device->stopVideo();
+  } catch (const std::runtime_error& e) {
+    throw KinectDeviceException("OpenKinectDeviceProxy::StopVideo", e.what());
+  }
+}
 
-KinectDeviceProxy* CreateKinectDeviceProxy(int index) {
-  return new OpenKinectDeviceProxy(index);
+std::unique_ptr<KinectDeviceProxy> CreateKinectDeviceProxy(int index) throw(
+    KinectDeviceException) {
+  return std::unique_ptr<KinectDeviceProxy>(new OpenKinectDeviceProxy(index));
 }
 
 }  // namespace lptc_coderdojo
