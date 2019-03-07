@@ -51,10 +51,12 @@ BIN_OBJS=$(addprefix $(BUILD_LIBS_DIR)/, \
 	command.o publisher.o)
 BIN=$(addprefix $(BUILD_BIN_DIR)/,kinect_serve)
 
-LPTC_DEVICE=OpenKinect
+LPTC_DEVICE?=OpenKinect
 LPTC_DEVICE_DEPS=
 ifeq ($(LPTC_DEVICE),OpenKinect)
 	include openkinect_device.mk
+else ifeq ($(LPTC_DEVICE),OpenNI2)
+	include openni2_device.mk
 endif
 
 include $(TESTS_DIR)/tests.mk
