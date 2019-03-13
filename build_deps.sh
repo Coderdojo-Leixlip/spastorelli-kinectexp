@@ -80,10 +80,34 @@ build_libopenni2() {
   info "Done."
 }
 
+copy_libnite2() {
+  local libs_dir="$1"
+  local nite2_data_dir="$(realpath ${NITE2_DIR}/Data)"
+
+  info "Copying libNiTE2 to ${libs_dir} ..."
+  cp ${NITE2_DIR}/libNiTE2.dylib ${libs_dir} >> ${LOG_FILE} 2>&1 || return
+  install_name_tool -id "@rpath/libNiTE2.dylib" \
+    ${libs_dir}/libNiTE2.dylib >> ${LOG_FILE} 2>&1 || return
+  install_name_tool -change "@executable_path/libOpenNI2.dylib" "@rpath/libOpenNI2.dylib" \
+    ${libs_dir}/libNiTE2.dylib >> ${LOG_FILE} 2>&1 || return
+  info "Done."
+
+  info "Setting up libNiTE2 Data directory..."
+  local new_data_dir="$(realpath -s ${libs_dir}/NiTE2)"
+  ln -s ${nite2_data_dir} ${libs_dir}/NiTE2 >> ${LOG_FILE} 2>&1 || return
+  cat ${NITE2_DIR}/NiTE.ini | sed -e "s~\(DataDir=\).*~\1${new_data_dir}~g" \
+    > ${BUILD_BIN_DIR}/NiTE.ini
+  info "Done."
+}
+
 build_openni2_device_deps() {
   info "Building ${DEVICE} deps..."
   if ! build_libopenni2 ${BUILD_LIBS_DIR} ; then
     err "Couldn't build libOpenNI2. See \`${LOG_FILE}\` for more details."
+    exit 1
+  fi
+  if ! copy_libnite2 ${BUILD_LIBS_DIR} ; then
+    err "Couldn't copy libNiTE2. See \`${LOG_FILE}\` for more details."
     exit 1
   fi
   if ! build_libfreenect_driver ${BUILD_LIBS_DIR} ; then
@@ -144,11 +168,13 @@ main() {
 
 readonly LOG_FILE=build_deps.log
 readonly OPENNI2_DIR=libs/OpenNI2
+readonly NITE2_DIR=libs/NiTE2
 readonly LIBFREENECT_DIR=libs/libfreenect
 readonly LIBFREENECT_BUILD_DIR=${LIBFREENECT_DIR}/build
-CLEAN='false'
+readonly BUILD_BIN_DIR=build/bin
 BUILD_LIBS_DIR=build/libs
 DEVICE=''
+CLEAN='false'
 
 while getopts "ch:o:" flag; do
   case "${flag}" in
