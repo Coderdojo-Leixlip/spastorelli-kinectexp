@@ -1,5 +1,6 @@
 build/**/*
 profiling/**/*
+src/protocol/*
 test_data/*
 .vscode/*
 build_deps.log

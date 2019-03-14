@@ -1,6 +1,6 @@
 #include "server.h"
 
-#include "../protocol/protocol_generated.h"
+#include "protocol/protocol_generated.h"
 #include "command.h"
 
 #include <flatbuffers/flatbuffers.h>

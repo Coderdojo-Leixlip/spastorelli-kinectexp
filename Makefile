@@ -9,7 +9,8 @@ GTEST_INCLUDES=-isystem $(GTEST_SRC_DIR)/include -I$(GTEST_SRC_DIR)
 SRC_DIR=src
 LIBS_DIR=libs
 TESTS_DIR=tests
-PROTO_DIR=protocol
+FBS_DIR=protocol
+GEN_FBS_DIR=$(SRC_DIR)/$(FBS_DIR)
 BUILD_DIR=build
 BUILD_BIN_DIR=$(BUILD_DIR)/bin
 BUILD_COVERAGE_DIR=$(BUILD_DIR)/coverage
@@ -24,6 +25,9 @@ SRCS=$(wildcard $(SRC_DIR)/*.cc)
 SRCS+=$(wildcard $(TESTS_DIR)/*.cc)
 HEADERS=$(wildcard $(SRC_DIR)/*.h)
 HEADERS+=$(wildcard $(TESTS_DIR)/*.h)
+FBS_SCHEMAS=$(wildcard $(FBS_DIR)/*.fbs)
+GEN_FBS_HEADERS=$(patsubst \
+	$(FBS_DIR)/%.fbs,$(GEN_FBS_DIR)/%_generated.h,$(FBS_SCHEMAS))
 INCLUDES+=-I $(SRC_DIR)
 
 LD_RPATHS=-rpath,$(PWD)/$(BUILD_LIBS_DIR)
@@ -63,10 +67,15 @@ include $(TESTS_DIR)/tests.mk
 
 default_target: $(BIN)
 
+$(GEN_FBS_DIR)/%_generated.h: $(FBS_DIR)/%.fbs
+	flatc --cpp --scoped-enums -o $(GEN_FBS_DIR) $<
+
 $(BUILD_LIBS_DIR)/%_test.o: $(TESTS_DIR)/%_test.cc
 $(BUILD_LIBS_DIR)/%_test.o: $(TESTS_DIR)/%_test.cc $(BUILD_DEPS_DIR)/%_test.d
 	$(COMPILE.cc) $(INCLUDES) $(GTEST_INCLUDES) $(OUTPUT_OPTION) $<
 	$(POSTCOMPILE)
+
+$(wildcard $(SRC_DIR)/*.cc): $(GEN_FBS_HEADERS)
 
 $(BUILD_LIBS_DIR)/%.o: $(SRC_DIR)/%.cc
 $(BUILD_LIBS_DIR)/%.o: $(SRC_DIR)/%.cc $(BUILD_DEPS_DIR)/%.d
@@ -78,8 +87,6 @@ $(LPTC_DEVICE_DEPS):
 
 $(BIN): $(LPTC_DEVICE_DEPS) $(BIN_OBJS)
 	$(LINK.cc) $(COVERAGE_FLAGS) -o $(BIN) $(BIN_OBJS)
-
-$(BIN_OBJS): $(PROTO_DIR)/protocol_generated.h
 
 .SECONDEXPANSION:
 $(TESTS): $$($$@_OBJS) $(BUILD_LIBS_DIR)/gtest-main.a
@@ -106,7 +113,7 @@ $(BUILD_LIBS_DIR)/gtest-main.a: $(BUILD_LIBS_DIR)/gtest-all.o \
 all: $(BIN) $(TESTS)
 
 run: $(BIN)
-	$(BIN_VARS) $(BIN)
+	(cd $(BUILD_BIN_DIR) && exec $(BIN_VARS) $(addprefix ./, $(notdir $(BIN))))
 
 run-tests: $(TESTS)
 	$(foreach TEST,$(TESTS), \
@@ -123,6 +130,7 @@ format:
 	clang-format -style=file -i $(SRCS) $(HEADERS)
 
 clean:
+	rm -rf $(GEN_FBS_DIR)
 	rm -rf $(BUILD_DIR)
 
 $(BUILD_DEPS_DIR)/%.d: ;
