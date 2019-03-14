@@ -16,26 +16,26 @@ class Publisher {
 
 class DepthDataPublisher : public Publisher {
  public:
-  DepthDataPublisher(lptc_coderdojo::KinectDevice& _device);
+  DepthDataPublisher(lptc_coderdojo::KinectDeviceProxy& _device);
 
   void PublishNewData(lptc_coderdojo::Channel* channel);
   void Transform();
 
  private:
-  lptc_coderdojo::KinectDevice& device;
+  lptc_coderdojo::KinectDeviceProxy& device;
   std::vector<uint16_t> buf;
   std::vector<uint8_t> frame;
 };
 
 class VideoDataPublisher : public Publisher {
  public:
-  VideoDataPublisher(lptc_coderdojo::KinectDevice& _device);
+  VideoDataPublisher(lptc_coderdojo::KinectDeviceProxy& _device);
 
   void PublishNewData(lptc_coderdojo::Channel* channel);
   void Transform();
 
  private:
-  lptc_coderdojo::KinectDevice& device;
+  lptc_coderdojo::KinectDeviceProxy& device;
   std::vector<uint8_t> buf;
   std::vector<uint8_t> frame;
 };

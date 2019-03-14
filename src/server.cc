@@ -1,13 +1,13 @@
 #include "server.h"
 
-#include "../protocol/protocol_generated.h"
+#include "protocol/protocol_generated.h"
 #include "command.h"
 
 #include <flatbuffers/flatbuffers.h>
 
 namespace lptc_coderdojo {
 
-BroadcastServer::BroadcastServer(lptc_coderdojo::KinectDevice& _device,
+BroadcastServer::BroadcastServer(lptc_coderdojo::KinectDeviceProxy& _device,
                                  const int _port)
     : port(_port), device(_device) {
   s.clear_access_channels(websocketpp::log::alevel::all);

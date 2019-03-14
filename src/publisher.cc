@@ -1,5 +1,6 @@
 #include "publisher.h"
-#include "../protocol/protocol_generated.h"
+
+#include "protocol/protocol_generated.h"
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -41,7 +42,8 @@ std::tuple<uint8_t*, size_t> SerializeMessage(
 
 namespace lptc_coderdojo {
 
-DepthDataPublisher::DepthDataPublisher(lptc_coderdojo::KinectDevice& _device)
+DepthDataPublisher::DepthDataPublisher(
+    lptc_coderdojo::KinectDeviceProxy& _device)
     : device(_device), frame(_device.GetDepthFrameRectSize() * 4) {}
 
 void DepthDataPublisher::PublishNewData(lptc_coderdojo::Channel* channel) {
@@ -66,7 +68,8 @@ void DepthDataPublisher::Transform() {
   }
 }
 
-VideoDataPublisher::VideoDataPublisher(lptc_coderdojo::KinectDevice& _device)
+VideoDataPublisher::VideoDataPublisher(
+    lptc_coderdojo::KinectDeviceProxy& _device)
     : device(_device), frame(_device.GetVideoFrameRectSize() * 4) {}
 
 void VideoDataPublisher::PublishNewData(lptc_coderdojo::Channel* channel) {

@@ -20,7 +20,7 @@ typedef std::set<websocketpp::connection_hdl,
 
 class BroadcastServer {
  public:
-  BroadcastServer(lptc_coderdojo::KinectDevice& _device, const int _port);
+  BroadcastServer(lptc_coderdojo::KinectDeviceProxy& _device, const int _port);
 
   void Run();
   void Stop();
@@ -46,7 +46,7 @@ class BroadcastServer {
   std::future<void> term_future;
 
   AsioServer s;
-  lptc_coderdojo::KinectDevice& device;
+  lptc_coderdojo::KinectDeviceProxy& device;
 
   ChannelMap channels;
   ConnectionSet connections;
